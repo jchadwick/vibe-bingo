@@ -1,0 +1,129 @@
+---
+description: AI rules derived by SpecStory from the project AI interaction history
+globs: *
+---
+
+## HEADERS
+
+This file defines the rules, coding standards, workflow guidelines, references, documentation structure, and best practices for the AI coding assistant. It is a living document, evolving with each project and interaction.
+
+## TECH STACK
+
+*   React (with Vite or Create React App)
+    *   When starting a new React project, prefer Vite for its speed and modern features.
+*   whisper-wasm
+
+## PROJECT DOCUMENTATION & CONTEXT SYSTEM
+
+## CODING STANDARDS
+
+## DEBUGGING
+
+## WORKFLOW & RELEASE RULES
+
+*   **Text-to-Speech (TTS):**
+    *   When implementing TTS, use the browser's `SpeechSynthesis` API.
+    *   Trigger TTS after the final number is selected, not during animations.
+    *   Always cancel any ongoing speech before starting a new one for clarity.
+    *   To say a number twice with a pause, use `setTimeout` to schedule the second utterance. Clear the timeout on new rolls or unmount.
+    *   When elongating/enunciating letters during TTS, follow specific instructions provided by the user (e.g., "Ooooo 64").
+    *   When calling a number, append the phrase if available (e.g., “B 11 — Legs eleven!”).
+    *   Do not use classic bingo calls or hype phrases. (ADDED 2025-05-26)
+*   **Automatic Number Rolling:**
+    *   Provide a Start/Pause button to control automatic rolling of numbers.
+    *   When the Start button is pushed, announce the next number immediately then continue the timed/automatic announcing. If the timer is resumed from pause, also immediately roll and announce the next number.
+    *   Include an interval selector (default 10s, min 3s, max 60s) to set the time between numbers.
+    *   When started, the app automatically rolls a new number every X seconds.
+    *   The Pause button stops the timer, and Start resumes it.
+    *   The BINGO! button also pauses the timer.
+    *   The timer is paused if all numbers are called or the game is reset.
+*   **Local Storage Persistence:**
+    *   Save and load the current game state (called, remaining, and current numbers) to local storage to survive reloads.
+*   **Responsive Layout:**
+    *   If the display is wide (e.g., `min-width: 700px` or monitor/landscape phone/tablet), show the basket and bingo board horizontally (side by side). On mobile/small screens, stack them vertically.
+*   **Voice Recognition:**
+    *   Use the Web Speech API to listen for the word "BINGO!".
+    *   When "BINGO!" is detected, trigger the BINGO button logic.
+    *   Provide a toggle button to start/stop listening.
+    *   Handle browser compatibility gracefully (show a message if not supported).
+    *   Restart recognition automatically if it stops unexpectedly.
+    *   Consider using a local AI model (e.g., Whisper) for lower latency and higher accuracy, but be aware of the increased complexity and resource requirements. For a single-word command like "BINGO", the Web Speech API is usually sufficient.
+    *   Implement Whisper (tiny model) alongside the Web Speech API. Provide a UI toggle to switch between them. Whisper implementation should use whisper.cpp WASM build.
+    *   When using Whisper (WASM) mode:
+        *   Continuously capture audio from the microphone in short overlapping chunks (e.g., 2 seconds with 1 second overlap).
+        *   As each chunk is captured, immediately transcribe it with Whisper.
+        *   If “bingo” is detected in any chunk, trigger the BINGO logic.
+        *   Use a fuzzy match for “bingo” (allowing for minor misrecognitions and typos).
+    *   Show a debug dialog at the very bottom that shows the current transcription from whisper. Reset/clear this every 10 seconds. Show the debug dialog for both whisper and web speech api. The debug dialog should always be visible when the app is in a "listening" or "transcribing" state (i.e., when either Whisper or Web Speech API is actively listening). When there’s no transcript, it should show a placeholder like “Listening…” or “No transcript yet.” When not listening, the debug dialog should be hidden.
+    *   After "bingo" is detected and announced, ignore further "bingo" detections for 5 seconds.
+*   **Vite Configuration for WASM:**
+    *   To fix the `WebAssembly.instantiateStreaming` error during development, configure Vite to serve `.wasm` files with the correct MIME type (`application/wasm`). Add the following to `vite.config.js`:
+
+    ```js
+    import { defineConfig } from 'vite'
+    import react from '@vitejs/plugin-react'
+
+    export default defineConfig({
+      plugins: [react()],
+      server: {
+        mimeTypes: {
+          'wasm': 'application/wasm'
+        }
+      }
+    })
+    ```
+    *   If your Vite version does not support `mimeTypes`, use the `configureServer` hook:
+
+    ```js
+    import { defineConfig } from 'vite'
+    import react from '@vitejs/plugin-react'
+
+    export default defineConfig({
+      plugins: [react()],
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.url.endsWith('.wasm')) {
+            res.setHeader('Content-Type', 'application/wasm');
+          }
+          next();
+        });
+      }
+    });
+    ```
+
+    *   For production (Vercel/Netlify/Other), ensure your server serves `.wasm` files with the `application/wasm` MIME type. For Nginx/Apache, add `AddType application/wasm .wasm`.
+    *   If using a package (like `whisper-wasm`), copy the WASM file (`whisper-wasm_bg.wasm`) from `node_modules/whisper-wasm/` to the `public/` directory as part of your build/start process.
+*   **Troubleshooting WASM Loading Issues:**
+    *   If `whisper.wasm` downloads as HTML instead of a WASM binary, it indicates a server-side issue. Possible causes include:
+        *   Server misconfiguration: The server might not be configured to serve `.wasm` files with the correct `application/wasm` MIME type.
+        *   Server-side error: The server might be encountering an error while trying to serve the file, resulting in an HTML error page being returned.
+    *   To diagnose, examine the network request for `whisper.wasm` in the browser's developer tools to inspect the server's response.
+*   **Response Style:**
+    *   Be direct and focused on solving the problem. Avoid unnecessary commentary.
+*   **UI Element Ordering:**
+    *   The desired UI element order is as follows:
+        1. Title
+        2. Basket
+        3. BingoBoard
+        4. Number history bar
+        5. Button row
+        6. Settings row
+        7. (Transcript/debug, etc.)
+*   **Number History Display:**
+    *   The number history display should be located below the bingo grid.
+    *   The most recent number should appear first (on the left).
+    *   The green ball should highlight the most recent number (leftmost).
+    *   The number history display should show the numbers themselves in the balls, not the bingo labels.
+*   **Confirmation Mode:**
+    *   Add a toggle for "Confirmation Mode" in the UI.
+    *   When enabled, use the Web Speech API (or Whisper if selected) to listen for spoken numbers.
+    *   When a number is detected, check if it’s in the `called` array.
+    *   Give immediate feedback:
+        *   If the number is valid (called), show a green check and/or play a sound.
+        *   If not, show a red X and/or play a different sound.
+    *   Display the last checked number and its status.
+    *   Announce “Yes” or “No” using TTS when a number is checked. "Yes" for a valid/called number, "No" for an invalid one. Use `setTimeout` to delay the TTS announcement slightly (e.g., 300ms), allowing recognition to finish before speaking.
+    *   In confirmation mode, only listen for numbers 1-75 (and add the BINGO letters automatically). The parser should:
+        *   Treat "O", "0", and "zero" as the "O" column.
+        *   Accept just a number (e.g., "12") and automatically assign the correct BINGO letter based on its range.
+        *   Ignore numbers outside 1-75.
